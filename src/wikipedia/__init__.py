@@ -9,6 +9,7 @@ from src.wikipedia.links import (
     LINK_PATTERN,
 )
 from src.wikipedia.pathfinder import PathFinder
+from src.wikipedia.sampler import ArticleSampler
 
 __all__ = [
     "WikipediaAPI",
@@ -19,4 +20,5 @@ __all__ = [
     "title_from_url",
     "LINK_PATTERN",
     "PathFinder",
+    "ArticleSampler",
 ]
