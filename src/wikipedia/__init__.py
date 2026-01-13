@@ -8,6 +8,7 @@ from src.wikipedia.links import (
     title_from_url,
     LINK_PATTERN,
 )
+from src.wikipedia.pathfinder import PathFinder
 
 __all__ = [
     "WikipediaAPI",
@@ -17,4 +18,5 @@ __all__ = [
     "normalize_wikipedia_url",
     "title_from_url",
     "LINK_PATTERN",
+    "PathFinder",
 ]
