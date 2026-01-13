@@ -3,10 +3,13 @@
 import asyncio
 import random
 from datetime import datetime
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, TYPE_CHECKING
 
 from src.wikipedia.api import WikipediaAPI
 from src.config import CUTOFF_DATE, WIKIPEDIA_API_URL
+
+if TYPE_CHECKING:
+    from src.wikipedia.pathfinder import PathFinder
 
 
 class ArticleSampler:
@@ -113,24 +116,54 @@ class ArticleSampler:
     async def sample_article_pairs(
         self,
         count: int,
-        post_cutoff_only: bool = False
+        post_cutoff_only: bool = False,
+        pathfinder: Optional["PathFinder"] = None,
+        max_path_depth: int = 6
     ) -> List[Tuple[str, str]]:
         """Sample pairs of (start, target) articles.
 
         For post_cutoff_only, BOTH articles must be post-cutoff.
+        If pathfinder is provided, verifies pairs have a path within max_path_depth.
         """
-        # Sample 2x count to get pairs
-        articles = await self.sample_valid_articles(
-            count * 2,
-            post_cutoff_only=post_cutoff_only,
-            max_attempts=200 if post_cutoff_only else 100
-        )
-
-        # Pair them up
         pairs = []
-        for i in range(0, len(articles) - 1, 2):
-            if len(pairs) >= count:
-                break
-            pairs.append((articles[i], articles[i + 1]))
+        attempts = 0
+        max_attempts = 50
+
+        while len(pairs) < count and attempts < max_attempts:
+            attempts += 1
+
+            # Sample batch of candidate articles
+            batch_size = max(4, (count - len(pairs)) * 4)
+            articles = await self.sample_valid_articles(
+                batch_size,
+                post_cutoff_only=post_cutoff_only,
+                max_attempts=200 if post_cutoff_only else 100
+            )
+
+            # Try to form pairs
+            random.shuffle(articles)
+            i = 0
+            while i < len(articles) - 1 and len(pairs) < count:
+                start, target = articles[i], articles[i + 1]
+                i += 2
+
+                # Skip if same article
+                if start.lower() == target.lower():
+                    continue
+
+                # Verify path exists if pathfinder provided
+                if pathfinder is not None:
+                    try:
+                        path_len = await pathfinder.compute_shortest_path(
+                            start, target, max_depth=max_path_depth
+                        )
+                        if path_len >= 999:
+                            # No path found, skip this pair
+                            continue
+                    except Exception:
+                        # Error computing path, skip
+                        continue
+
+                pairs.append((start, target))
 
         return pairs

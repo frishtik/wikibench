@@ -9,7 +9,10 @@ from src.config import WIKIPEDIA_API_URL
 
 
 class WikipediaAPI:
-    """Basic MediaWiki API client with rate limiting (100ms between requests)."""
+    """Basic MediaWiki API client with rate limiting (100ms between requests).
+
+    Uses an async lock to ensure rate limiting works with concurrent requests.
+    """
 
     def __init__(self):
         # Wikipedia requires a User-Agent header
@@ -17,27 +20,45 @@ class WikipediaAPI:
             "User-Agent": "WikiBench/1.0 (https://github.com/wikibench; wikibench@example.com)"
         }
         self.client = httpx.AsyncClient(timeout=30.0, headers=headers)
-        self._last_request_time = 0.0
-        self._rate_limit_delay = 0.1  # 100ms
+        # Allow up to 3 concurrent requests with delay between each
+        self._semaphore = asyncio.Semaphore(3)
+        self._request_delay = 0.2  # 200ms between requests within semaphore
 
     async def _rate_limit(self):
-        """Ensure minimum delay between requests."""
-        current_time = time.monotonic()
-        elapsed = current_time - self._last_request_time
-        if elapsed < self._rate_limit_delay:
-            await asyncio.sleep(self._rate_limit_delay - elapsed)
-        self._last_request_time = time.monotonic()
+        """Limit concurrent requests using a semaphore."""
+        await self._semaphore.acquire()
+        # Small delay before making request
+        await asyncio.sleep(self._request_delay)
+
+    def _release_rate_limit(self):
+        """Release semaphore after request completes."""
+        self._semaphore.release()
 
     async def query(self, **params) -> dict:
-        """Make a query to the MediaWiki API."""
+        """Make a query to the MediaWiki API with retry logic."""
         params["format"] = "json"
         params["action"] = "query"
-        await self._rate_limit()
-        response = await self.client.get(WIKIPEDIA_API_URL, params=params)
-        return response.json()
+
+        last_error = None
+        for attempt in range(3):  # Up to 3 attempts
+            await self._rate_limit()
+            try:
+                response = await self.client.get(WIKIPEDIA_API_URL, params=params)
+                response.raise_for_status()
+                result = response.json()
+                self._release_rate_limit()
+                return result
+            except (httpx.HTTPStatusError, ValueError) as e:
+                self._release_rate_limit()
+                last_error = e
+                if attempt < 2:
+                    await asyncio.sleep(0.5 * (attempt + 1))
+                    continue
+                raise ValueError(f"Wikipedia API query failed after 3 attempts: {e}")
+        return {}
 
     async def get_page_html(self, title: str) -> str:
-        """Get the HTML content of a Wikipedia page."""
+        """Get the HTML content of a Wikipedia page with retry logic."""
         params = {
             "format": "json",
             "action": "parse",
@@ -45,12 +66,24 @@ class WikipediaAPI:
             "prop": "text",
             "disableeditsection": "true",
         }
-        await self._rate_limit()
-        response = await self.client.get(WIKIPEDIA_API_URL, params=params)
-        data = response.json()
-        if "error" in data:
-            raise ValueError(f"Error fetching page '{title}': {data['error'].get('info', 'Unknown error')}")
-        return data.get("parse", {}).get("text", {}).get("*", "")
+
+        for attempt in range(3):
+            await self._rate_limit()
+            try:
+                response = await self.client.get(WIKIPEDIA_API_URL, params=params)
+                response.raise_for_status()
+                data = response.json()
+                self._release_rate_limit()
+                if "error" in data:
+                    raise ValueError(f"Error fetching page '{title}': {data['error'].get('info', 'Unknown error')}")
+                return data.get("parse", {}).get("text", {}).get("*", "")
+            except (httpx.HTTPStatusError, ValueError) as e:
+                self._release_rate_limit()
+                if attempt < 2:
+                    await asyncio.sleep(0.5 * (attempt + 1))
+                    continue
+                raise ValueError(f"Failed to fetch page '{title}' after 3 attempts: {e}")
+        return ""
 
     async def get_page_links(self, title: str) -> list[str]:
         """Get all outgoing links from a page (namespace 0 only).

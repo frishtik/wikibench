@@ -22,7 +22,8 @@ MODEL_REASONING_CONFIG: dict[str, dict[str, dict[str, Any]]] = {
     },
     "anthropic/claude-opus-4.5": {
         # Anthropic uses max_tokens budget (min 1024, max 128000)
-        "highest": {"reasoning": {"max_tokens": 128000, "exclude": True}},
+        # Using 16384 for highest as it's practical for this task while still being high
+        "highest": {"reasoning": {"max_tokens": 16384, "exclude": True}},
         "lowest": {"reasoning": {"max_tokens": 1024, "exclude": True}},
     },
     "x-ai/grok-4.1-fast": {

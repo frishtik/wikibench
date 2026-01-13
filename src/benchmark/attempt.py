@@ -55,11 +55,10 @@ class AttemptRunner:
         Returns:
             AttemptMetrics with full step-by-step data
         """
-        # Compute best path if not provided
+        # Don't compute best path during attempt (too slow for parallel execution)
+        # Best path will be computed later for metrics if needed
         if best_path_length is None:
-            best_path_length = await self.pathfinder.compute_shortest_path(
-                start_title, target_title
-            )
+            best_path_length = 999  # Unknown
 
         # Build system prompt prefix based on condition
         prompt_prefix = ""
@@ -85,28 +84,15 @@ class AttemptRunner:
             system_prompt_prefix=prompt_prefix,
         )
 
-        # Compute step metrics with remaining distances
+        # Simplified step metrics (skip distance computation for speed)
+        # Distance computation is too slow for parallel execution
         step_metrics = []
         for i, step in enumerate(result.steps):
-            # Get remaining distance before and after
-            if i == 0:
-                distance_before = await self.pathfinder.get_remaining_distance(
-                    start_title, target_title
-                )
-            else:
-                distance_before = step_metrics[-1].remaining_distance_after
-
-            distance_after = await self.pathfinder.get_remaining_distance(
-                step.chosen_target_title, target_title
-            )
-
-            direction = self.pathfinder.classify_step(distance_before, distance_after)
-
             step_metrics.append(StepMetrics(
                 step_index=step.step_index,
-                remaining_distance_before=distance_before,
-                remaining_distance_after=distance_after,
-                step_direction=direction,
+                remaining_distance_before=999,  # Unknown
+                remaining_distance_after=999,   # Unknown
+                step_direction="unknown",
             ))
 
         # Build attempt metrics

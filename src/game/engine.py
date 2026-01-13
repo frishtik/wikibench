@@ -7,9 +7,22 @@ from src.openrouter_client import chat_completion
 from src.reasoning_config import ReasoningMode
 from src.wikipedia.api import WikipediaAPI
 from src.wikipedia.article import fetch_article_markdown
-from src.wikipedia.links import extract_links_from_markdown, title_from_url
+from src.wikipedia.links import extract_links_from_markdown, title_from_url, normalize_wikipedia_url
 from src.game.prompts import get_system_prompt, get_user_prompt
 from src.game.parser import parse_response
+
+
+def normalize_url_to_path(url: str) -> str:
+    """Normalize a URL to /wiki/Title format for comparison."""
+    # Handle full URLs
+    if url.startswith("https://en.wikipedia.org/wiki/"):
+        return "/wiki/" + url[30:]
+    elif url.startswith("http://en.wikipedia.org/wiki/"):
+        return "/wiki/" + url[29:]
+    elif url.startswith("//en.wikipedia.org/wiki/"):
+        return "/wiki/" + url[24:]
+    # Already in path format
+    return url
 
 @dataclass
 class GameStep:
@@ -106,15 +119,18 @@ class WikiGameEngine:
 
                 link_text, link_url = parsed
 
+                # Normalize URL to path format for comparison
+                normalized_url = normalize_url_to_path(link_url)
+
                 # Validate link exists in article
-                if link_url in valid_urls:
-                    chosen_link = (link_text, link_url)
+                if normalized_url in valid_urls:
+                    chosen_link = (link_text, normalized_url)
                     break
 
-                # Try URL normalization - sometimes models add/remove trailing slashes
-                normalized_url = link_url.rstrip('/')
+                # Try without trailing slash
+                normalized_no_slash = normalized_url.rstrip('/')
                 for valid_url in valid_urls:
-                    if valid_url.rstrip('/') == normalized_url:
+                    if valid_url.rstrip('/') == normalized_no_slash:
                         chosen_link = (link_text, valid_url)
                         break
 

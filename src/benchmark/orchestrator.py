@@ -24,11 +24,12 @@ from src.benchmark.metrics import BenchmarkMetrics, AttemptMetrics
 class BenchmarkOrchestrator:
     """Orchestrates running benchmark conditions with parallelization."""
 
-    def __init__(self, max_concurrent: int = 8):
+    def __init__(self, max_concurrent: int = 4):
         """Initialize orchestrator.
 
         Args:
             max_concurrent: Maximum concurrent attempts across all models
+                           (keep low to avoid overwhelming Wikipedia API)
         """
         self.max_concurrent = max_concurrent
         self.semaphore = asyncio.Semaphore(max_concurrent)
@@ -69,13 +70,16 @@ class BenchmarkOrchestrator:
             if len(pairs) < ATTEMPTS_PER_MODEL:
                 print(f"Warning: Only got {len(pairs)} pairs")
 
-            # Pre-compute best paths for all pairs (needed for peer pressure)
-            print("Computing best paths...")
+            # Pre-compute best paths only if needed (for peer pressure)
             best_paths = {}
-            for start, target in pairs:
-                best_paths[(start, target)] = await pathfinder.compute_shortest_path(
-                    start, target
-                )
+            if config.use_peer_pressure:
+                print("Computing best paths (needed for peer pressure)...")
+                for i, (start, target) in enumerate(pairs):
+                    print(f"  Path {i+1}/{len(pairs)}: {start} -> {target}", flush=True)
+                    best_paths[(start, target)] = await pathfinder.compute_shortest_path(
+                        start, target, max_depth=4
+                    )
+                    print(f"    Result: {best_paths[(start, target)]}", flush=True)
 
             # Create all tasks
             tasks = []
