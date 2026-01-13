@@ -12,7 +12,11 @@ class WikipediaAPI:
     """Basic MediaWiki API client with rate limiting (100ms between requests)."""
 
     def __init__(self):
-        self.client = httpx.AsyncClient(timeout=30.0)
+        # Wikipedia requires a User-Agent header
+        headers = {
+            "User-Agent": "WikiBench/1.0 (https://github.com/wikibench; wikibench@example.com)"
+        }
+        self.client = httpx.AsyncClient(timeout=30.0, headers=headers)
         self._last_request_time = 0.0
         self._rate_limit_delay = 0.1  # 100ms
 
