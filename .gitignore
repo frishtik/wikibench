@@ -10,12 +10,15 @@ __pycache__/
 .vscode/
 *.swp
 
-# Outputs (keep structure but not results)
-outputs/*/graphs/
-outputs/*/results.csv
+# Outputs (keep structure but not actual results)
+outputs/*/*.csv
+outputs/*/*.txt
+outputs/*/*.png
 outputs/*/traces/
+outputs/*/tips/
 
 # But keep .gitkeep files
+!outputs/.gitkeep
 !outputs/*/.gitkeep
 
 # Cache
