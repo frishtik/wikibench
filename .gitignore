@@ -1,0 +1,26 @@
+# Environment
+.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Outputs (keep structure but not results)
+outputs/*/graphs/
+outputs/*/results.csv
+outputs/*/traces/
+
+# But keep .gitkeep files
+!outputs/*/.gitkeep
+
+# Cache
+.cache/
+*.cache
+
+# OS
+.DS_Store
