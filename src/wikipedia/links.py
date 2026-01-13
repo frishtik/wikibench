@@ -20,12 +20,31 @@ def extract_links_from_markdown(markdown: str) -> list[tuple[str, str]]:
         if not text.strip() or not href.strip():
             continue
 
+        # Strip title attribute from href (e.g., '/wiki/Animal "Animal"' -> '/wiki/Animal')
+        href = strip_title_attribute(href)
+
         # Check if it's a valid Wikipedia article link
         normalized = normalize_wikipedia_url(href)
         if normalized is not None:
             links.append((text, href))
 
     return links
+
+
+def strip_title_attribute(href: str) -> str:
+    """Strip title attribute from markdown link href.
+
+    Markdown links from Wikipedia often have title attributes:
+    [text](/wiki/Article "Article Title") -> href="/wiki/Article \"Article Title\""
+
+    This extracts just the URL part.
+    """
+    # Title attributes start with space + quote
+    if ' "' in href:
+        href = href.split(' "')[0]
+    elif " '" in href:
+        href = href.split(" '")[0]
+    return href.strip()
 
 
 def normalize_wikipedia_url(href: str) -> str | None:
